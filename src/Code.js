@@ -30,26 +30,47 @@ function getCalendars() {
 }
 
 /**
+ * Returns previously saved sidebar settings from user properties.
+ * @returns {{startDate: string, endDate: string, selectedCalendarIds: string[], selectedColumns: string[]}}
+ */
+function getSavedSettings() {
+  const props = PropertiesService.getUserProperties();
+  const raw = props.getProperties();
+  return {
+    startDate:           raw.startDate           || '',
+    endDate:             raw.endDate             || '',
+    selectedCalendarIds: raw.selectedCalendarIds ? JSON.parse(raw.selectedCalendarIds) : null,
+    selectedColumns:     raw.selectedColumns     ? JSON.parse(raw.selectedColumns)     : null
+  };
+}
+
+/**
  * Imports events from the selected calendars into the active sheet.
  * @param {Object} params
- * @param {string} params.startDate  ISO date string "YYYY-MM-DD"
- * @param {string} params.endDate    ISO date string "YYYY-MM-DD"
+ * @param {string}   params.startDate     ISO date string "YYYY-MM-DD"
+ * @param {string}   params.endDate       ISO date string "YYYY-MM-DD"
  * @param {string[]} params.calendarIds
+ * @param {string[]} [params.columns]     Column names to include; omit for all columns
  * @returns {{count: number, sheetName: string}}
  */
 function importEvents(params) {
-  const { startDate, endDate, calendarIds } = params;
+  const { startDate, endDate, calendarIds, columns } = params;
 
   // Build time bounds — end date is inclusive (push to end of day)
   const timeMin = new Date(startDate + 'T00:00:00').toISOString();
   const timeMax = new Date(endDate + 'T23:59:59').toISOString();
 
-  const HEADERS = [
+  const ALL_COLUMNS = [
     'Title', 'Start', 'End', 'All Day',
     'Description', 'Location', 'Attendees',
     'Calendar', 'Status', 'Creator', 'Organizer', 'Event ID',
     'Recurring', 'Recurrence'
   ];
+
+  // Determine which columns to write, preserving original order
+  const selectedColumns = (columns && columns.length) ? ALL_COLUMNS.filter(c => columns.includes(c)) : ALL_COLUMNS;
+  const colIndex = {};
+  ALL_COLUMNS.forEach((c, i) => { colIndex[c] = i; });
 
   const rows = [];
   const rruleCache = {};  // key: calId + '|' + recurringEventId → human-readable string
@@ -106,7 +127,7 @@ function importEvents(params) {
           recurrenceLabel = rruleCache[cacheKey];
         }
 
-        rows.push([
+        const fullRow = [
           event.summary    || '',
           start,
           end,
@@ -121,7 +142,9 @@ function importEvents(params) {
           event.id,
           isRecurring,
           recurrenceLabel
-        ]);
+        ];
+
+        rows.push(selectedColumns.map(c => fullRow[colIndex[c]]));
       }
 
       pageToken = response.nextPageToken;
@@ -134,20 +157,34 @@ function importEvents(params) {
   sheet.clearFormats();
 
   // Header row
-  const headerRange = sheet.getRange(1, 1, 1, HEADERS.length);
-  headerRange.setValues([HEADERS]);
+  const headerRange = sheet.getRange(1, 1, 1, selectedColumns.length);
+  headerRange.setValues([selectedColumns]);
   headerRange.setFontWeight('bold');
   headerRange.setBackground('#1a73e8');
   headerRange.setFontColor('#ffffff');
 
   // Data rows
   if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
+    sheet.getRange(2, 1, rows.length, selectedColumns.length).setValues(rows);
 
-    sheet.getRange(2, 2, rows.length, 2).setNumberFormat('yyyy-mm-dd hh:mm');
+    // Format Start and End date columns if selected
+    ['Start', 'End'].forEach(colName => {
+      const pos = selectedColumns.indexOf(colName);
+      if (pos !== -1) {
+        sheet.getRange(2, pos + 1, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm');
+      }
+    });
   }
 
   sheet.setFrozenRows(1);
+
+  // Save settings for next session
+  PropertiesService.getUserProperties().setProperties({
+    startDate:           startDate,
+    endDate:             endDate,
+    selectedCalendarIds: JSON.stringify(calendarIds),
+    selectedColumns:     JSON.stringify(selectedColumns)
+  });
 
   return { count: rows.length, sheetName: sheet.getName() };
 }
@@ -170,7 +207,6 @@ function _getCalendarName(calId) {
 function _parseRRule(rrule) {
   const DAY_NAMES = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' };
 
-  // Strip "RRULE:" prefix and parse key=value pairs
   const parts = {};
   rrule.replace(/^RRULE:/, '').split(';').forEach(part => {
     const [k, v] = part.split('=');

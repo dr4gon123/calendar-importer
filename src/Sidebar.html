@@ -37,10 +37,12 @@
       margin-bottom: 8px;
     }
 
+    /* ── Date range ── */
     .date-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+      margin-bottom: 8px;
     }
 
     .date-field label {
@@ -62,10 +64,42 @@
       transition: border-color 0.15s;
     }
 
-    input[type="date"]:focus {
-      border-color: #1a73e8;
+    input[type="date"]:focus { border-color: #1a73e8; }
+
+    .preset-row {
+      display: flex;
+      gap: 5px;
+      margin-top: 5px;
     }
 
+    .preset-btn {
+      flex: 1;
+      padding: 4px 0;
+      border: 1px solid #dadce0;
+      border-radius: 12px;
+      background: #f8f9fa;
+      font-size: 11px;
+      color: #5f6368;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+
+    .preset-btn:hover {
+      background: #e8f0fe;
+      border-color: #1a73e8;
+      color: #1a73e8;
+    }
+
+    .preset-btn.active {
+      background: #e8f0fe;
+      border-color: #1a73e8;
+      color: #1a73e8;
+      font-weight: 500;
+    }
+
+    /* ── Calendar list ── */
     .calendar-search {
       display: block;
       width: 100%;
@@ -87,7 +121,7 @@
     .calendar-list {
       border: 1px solid #dadce0;
       border-radius: 0 0 4px 4px;
-      max-height: 260px;
+      max-height: 220px;
       overflow-y: auto;
     }
 
@@ -150,6 +184,65 @@
       color: #5f6368;
     }
 
+    /* ── Collapsible columns section ── */
+    .collapsible-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 0;
+    }
+
+    .collapsible-header:hover .section-label { color: #1a73e8; }
+
+    .collapsible-arrow {
+      font-size: 10px;
+      color: #5f6368;
+      transition: transform 0.2s;
+    }
+
+    .collapsible-arrow.open { transform: rotate(180deg); }
+
+    .collapsible-body {
+      display: none;
+      margin-top: 8px;
+    }
+
+    .collapsible-body.open { display: block; }
+
+    .columns-list {
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .columns-list-header {
+      padding: 6px 10px;
+      border-bottom: 1px solid #dadce0;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+    }
+
+    .col-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-bottom: 1px solid #f1f3f4;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .col-item:last-child { border-bottom: none; }
+    .col-item:hover { background: #f8f9fa; }
+
+    /* ── Import button ── */
     .btn-import {
       width: 100%;
       padding: 9px;
@@ -225,6 +318,18 @@
         <input type="date" id="endDate">
       </div>
     </div>
+    <div class="preset-row" id="modifierRow">
+      <button class="preset-btn" onclick="selectModifier('last')">Last</button>
+      <button class="preset-btn" onclick="selectModifier('this')">This</button>
+      <button class="preset-btn" onclick="selectModifier('next')">Next</button>
+    </div>
+    <div class="preset-row" id="unitRow">
+      <button class="preset-btn" onclick="selectUnit('day')">Day</button>
+      <button class="preset-btn" onclick="selectUnit('week')">Week</button>
+      <button class="preset-btn" onclick="selectUnit('month')">Month</button>
+      <button class="preset-btn" onclick="selectUnit('quarter')">Quarter</button>
+      <button class="preset-btn" onclick="selectUnit('year')">Year</button>
+    </div>
   </div>
 
   <!-- Calendar Selection -->
@@ -233,6 +338,17 @@
     <input type="text" class="calendar-search" id="calSearch" placeholder="Search calendars…" oninput="filterCalendars()" style="display:none">
     <div class="calendar-list" id="calendarList">
       <div class="loading-calendars">Loading calendars…</div>
+    </div>
+  </div>
+
+  <!-- Column Selector (collapsible) -->
+  <div class="section">
+    <div class="collapsible-header" onclick="toggleColumns()">
+      <div class="section-label" style="margin-bottom:0">Columns</div>
+      <span class="collapsible-arrow" id="colArrow">▼</span>
+    </div>
+    <div class="collapsible-body" id="colBody">
+      <div class="columns-list" id="columnsList"></div>
     </div>
   </div>
 
@@ -245,30 +361,130 @@
   <div class="status" id="status"></div>
 
   <script>
-    // ── Init: set default dates ──────────────────────────────────────────────
-    (function initDates() {
-      const today = new Date();
-      const future = new Date();
-      future.setDate(today.getDate() + 30);
-      document.getElementById('startDate').value = toDateString(today);
-      document.getElementById('endDate').value   = toDateString(future);
-    })();
+    var ALL_COLUMNS = [
+      'Title', 'Start', 'End', 'All Day',
+      'Description', 'Location', 'Attendees',
+      'Calendar', 'Status', 'Creator', 'Organizer', 'Event ID',
+      'Recurring', 'Recurrence'
+    ];
+
+    var allCalendars = [];
+    var checkedState = {};       // calId → boolean
+    var savedSettings = null;    // loaded once on open
+
+    // ── Init ────────────────────────────────────────────────────────────────
+
+    // Load saved settings first, then calendars (so saved selection can be applied)
+    google.script.run
+      .withSuccessHandler(function(settings) {
+        savedSettings = settings;
+        applyDefaultDates(settings);
+        buildColumnsList();
+        google.script.run
+          .withSuccessHandler(renderCalendars)
+          .withFailureHandler(function() {
+            document.getElementById('calendarList').innerHTML =
+              '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
+          })
+          .getCalendars();
+      })
+      .withFailureHandler(function() {
+        applyDefaultDates(null);
+        buildColumnsList();
+        google.script.run
+          .withSuccessHandler(renderCalendars)
+          .withFailureHandler(function() {
+            document.getElementById('calendarList').innerHTML =
+              '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
+          })
+          .getCalendars();
+      })
+      .getSavedSettings();
+
+    // ── Dates ────────────────────────────────────────────────────────────────
+
+    function applyDefaultDates(settings) {
+      if (settings && settings.startDate && settings.endDate) {
+        document.getElementById('startDate').value = settings.startDate;
+        document.getElementById('endDate').value   = settings.endDate;
+      } else {
+        const today = new Date();
+        const future = new Date();
+        future.setDate(today.getDate() + 30);
+        document.getElementById('startDate').value = toDateString(today);
+        document.getElementById('endDate').value   = toDateString(future);
+      }
+    }
 
     function toDateString(d) {
       return d.toISOString().slice(0, 10);
     }
 
-    // ── Load calendars ───────────────────────────────────────────────────────
-    google.script.run
-      .withSuccessHandler(renderCalendars)
-      .withFailureHandler(function(err) {
-        document.getElementById('calendarList').innerHTML =
-          '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
-      })
-      .getCalendars();
+    var selectedModifier = null;
+    var selectedUnit = null;
 
-    var allCalendars = [];
-    var checkedState = {};  // source of truth: calId → boolean
+    function selectModifier(val) {
+      selectedModifier = val;
+      document.querySelectorAll('#modifierRow .preset-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === val);
+      });
+      applyPresetIfReady();
+    }
+
+    function selectUnit(val) {
+      selectedUnit = val;
+      document.querySelectorAll('#unitRow .preset-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === val);
+      });
+      applyPresetIfReady();
+    }
+
+    function applyPresetIfReady() {
+      if (!selectedModifier || !selectedUnit) return;
+      var dates = computePresetDates(selectedModifier, selectedUnit);
+      document.getElementById('startDate').value = toDateString(dates.start);
+      document.getElementById('endDate').value   = toDateString(dates.end);
+    }
+
+    function computePresetDates(modifier, unit) {
+      var today = new Date();
+      var y = today.getFullYear();
+      var m = today.getMonth(); // 0-based
+      var offset = modifier === 'last' ? -1 : modifier === 'next' ? 1 : 0;
+      var start, end;
+
+      if (unit === 'day') {
+        start = new Date(y, m, today.getDate() + offset);
+        end   = new Date(start);
+
+      } else if (unit === 'week') {
+        var dow = today.getDay();
+        var daysFromMon = dow === 0 ? 6 : dow - 1; // Monday = 0
+        var thisMonday = new Date(y, m, today.getDate() - daysFromMon);
+        start = new Date(thisMonday); start.setDate(thisMonday.getDate() + offset * 7);
+        end   = new Date(start);     end.setDate(start.getDate() + 6);
+
+      } else if (unit === 'month') {
+        start = new Date(y, m + offset, 1);
+        end   = new Date(y, m + offset + 1, 0);
+
+      } else if (unit === 'quarter') {
+        var currentQ = Math.floor(m / 3);
+        var targetQ  = currentQ + offset;
+        var targetY  = y + Math.floor(targetQ / 4);
+        targetQ = ((targetQ % 4) + 4) % 4; // wrap to 0–3
+        start = new Date(targetY, targetQ * 3, 1);
+        end   = new Date(targetY, targetQ * 3 + 3, 0);
+
+      } else if (unit === 'year') {
+        start = new Date(y + offset, 0, 1);
+        end   = new Date(y + offset, 11, 31);
+      }
+
+      return { start: start, end: end };
+    }
+
+    // ── Calendars ───────────────────────────────────────────────────────────
 
     function renderCalendars(calendars) {
       if (!calendars || calendars.length === 0) {
@@ -279,8 +495,11 @@
 
       allCalendars = calendars;
 
-      // Initialize all as checked
-      calendars.forEach(cal => { checkedState[cal.id] = true; });
+      // Initialize all as checked, then apply saved selection if available
+      const savedIds = savedSettings && savedSettings.selectedCalendarIds;
+      calendars.forEach(cal => {
+        checkedState[cal.id] = savedIds ? savedIds.includes(cal.id) : true;
+      });
 
       document.getElementById('calSearch').style.display = 'block';
       buildCalendarList(calendars);
@@ -299,7 +518,7 @@
       let html = `
         <div class="calendar-list-header">
           <span style="font-size:11px;color:#5f6368" id="calCount"></span>
-          <span class="toggle-all" onclick="toggleAll()">Select all / None</span>
+          <span class="toggle-all" onclick="toggleAllCals()">Select all / None</span>
         </div>`;
 
       for (const cal of calendars) {
@@ -338,8 +557,7 @@
           : `${Object.values(checkedState).filter(Boolean).length} of ${total} selected`;
     }
 
-    // ── Toggle all checkboxes ────────────────────────────────────────────────
-    function toggleAll() {
+    function toggleAllCals() {
       const checkboxes = document.querySelectorAll('.cal-checkbox');
       const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
       checkboxes.forEach(cb => {
@@ -349,7 +567,43 @@
       updateCountLabel();
     }
 
-    // ── Run import ───────────────────────────────────────────────────────────
+    // ── Columns ─────────────────────────────────────────────────────────────
+
+    function buildColumnsList() {
+      const savedCols = savedSettings && savedSettings.selectedColumns;
+      let html = `
+        <div class="columns-list-header">
+          <span style="font-size:11px;color:#5f6368">${ALL_COLUMNS.length} columns</span>
+          <span class="toggle-all" onclick="toggleAllCols()">Select all / None</span>
+        </div>`;
+
+      for (const col of ALL_COLUMNS) {
+        const isChecked = savedCols ? savedCols.includes(col) : true;
+        html += `
+          <label class="col-item">
+            <input type="checkbox" class="col-checkbox" value="${col}" ${isChecked ? 'checked' : ''}>
+            <span>${col}</span>
+          </label>`;
+      }
+
+      document.getElementById('columnsList').innerHTML = html;
+    }
+
+    function toggleAllCols() {
+      const checkboxes = document.querySelectorAll('.col-checkbox');
+      const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+      checkboxes.forEach(cb => { cb.checked = anyUnchecked; });
+    }
+
+    function toggleColumns() {
+      const body  = document.getElementById('colBody');
+      const arrow = document.getElementById('colArrow');
+      const open  = body.classList.toggle('open');
+      arrow.classList.toggle('open', open);
+    }
+
+    // ── Import ───────────────────────────────────────────────────────────────
+
     function runImport() {
       const startDate = document.getElementById('startDate').value;
       const endDate   = document.getElementById('endDate').value;
@@ -364,9 +618,14 @@
       }
 
       const calendarIds = Object.keys(checkedState).filter(id => checkedState[id]);
-
       if (calendarIds.length === 0) {
         showStatus('error', 'Please select at least one calendar.');
+        return;
+      }
+
+      const columns = Array.from(document.querySelectorAll('.col-checkbox:checked')).map(cb => cb.value);
+      if (columns.length === 0) {
+        showStatus('error', 'Please select at least one column.');
         return;
       }
 
@@ -383,16 +642,14 @@
           setLoading(false);
           showStatus('error', 'Error: ' + (err.message || err));
         })
-        .importEvents({ startDate, endDate, calendarIds });
+        .importEvents({ startDate, endDate, calendarIds, columns });
     }
 
     function setLoading(on) {
       const btn = document.getElementById('importBtn');
-      const spinner = document.getElementById('spinner');
-      const label = document.getElementById('btnLabel');
+      document.getElementById('spinner').style.display = on ? 'block' : 'none';
+      document.getElementById('btnLabel').textContent = on ? 'Importing…' : 'Import Events';
       btn.disabled = on;
-      spinner.style.display = on ? 'block' : 'none';
-      label.textContent = on ? 'Importing…' : 'Import Events';
     }
 
     function showStatus(type, msg) {
@@ -402,8 +659,7 @@
     }
 
     function hideStatus() {
-      const el = document.getElementById('status');
-      el.className = 'status';
+      document.getElementById('status').className = 'status';
     }
   </script>
 </body>
