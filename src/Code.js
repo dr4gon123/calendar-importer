@@ -64,7 +64,8 @@ function importEvents(params) {
     'Title', 'Start', 'End', 'All Day',
     'Description', 'Location', 'Attendees',
     'Calendar', 'Status', 'Creator', 'Organizer', 'Event ID',
-    'Recurring', 'Recurrence'
+    'Recurring', 'Recurrence',
+    'Meet Link', 'Calendar Link', 'Original Start'
   ];
 
   // Determine which columns to write, preserving original order
@@ -127,6 +128,17 @@ function importEvents(params) {
           recurrenceLabel = rruleCache[cacheKey];
         }
 
+        const meetLink = event.hangoutLink ||
+          (event.conferenceData && event.conferenceData.entryPoints &&
+           (event.conferenceData.entryPoints.find(e => e.entryPointType === 'video') ||
+            event.conferenceData.entryPoints[0] || {}).uri) || '';
+
+        const originalStart = event.originalStartTime
+          ? (event.originalStartTime.dateTime
+              ? new Date(event.originalStartTime.dateTime)
+              : event.originalStartTime.date)
+          : '';
+
         const fullRow = [
           event.summary    || '',
           start,
@@ -141,7 +153,10 @@ function importEvents(params) {
           event.organizer?.email || '',
           event.id,
           isRecurring,
-          recurrenceLabel
+          recurrenceLabel,
+          meetLink,
+          event.htmlLink || '',
+          originalStart
         ];
 
         rows.push(selectedColumns.map(c => fullRow[colIndex[c]]));
