@@ -1,0 +1,13 @@
+{
+  "name": "calendar-importer",
+  "version": "1.0.0",
+  "description": "Google Sheets add-on to import Google Calendar events",
+  "scripts": {
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}
