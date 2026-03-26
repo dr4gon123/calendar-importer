@@ -118,6 +118,26 @@
       border-bottom: none;
     }
 
+    .col-search {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 1px solid #dadce0;
+      border-radius: 4px 4px 0 0;
+      border-bottom: none;
+      font-size: 12px;
+      color: #202124;
+      background: #fff;
+      outline: none;
+      margin-bottom: 0;
+    }
+
+    .col-search:focus {
+      border-color: #1a73e8;
+      border-bottom: none;
+    }
+
     .calendar-list {
       border: 1px solid #dadce0;
       border-radius: 0 0 4px 4px;
@@ -213,7 +233,7 @@
 
     .columns-list {
       border: 1px solid #dadce0;
-      border-radius: 4px;
+      border-radius: 0 0 4px 4px;
       max-height: 180px;
       overflow-y: auto;
     }
@@ -348,6 +368,7 @@
       <span class="collapsible-arrow" id="colArrow">▼</span>
     </div>
     <div class="collapsible-body" id="colBody">
+      <input type="text" class="col-search" id="colSearch" placeholder="Search columns…" oninput="filterColumns()">
       <div class="columns-list" id="columnsList"></div>
     </div>
   </div>
@@ -574,7 +595,7 @@
       const savedCols = savedSettings && savedSettings.selectedColumns;
       let html = `
         <div class="columns-list-header">
-          <span style="font-size:11px;color:#5f6368">${ALL_COLUMNS.length} columns</span>
+          <span style="font-size:11px;color:#5f6368" id="colCount"></span>
           <span class="toggle-all" onclick="toggleAllCols()">Select all / None</span>
         </div>`;
 
@@ -582,18 +603,43 @@
         const isChecked = savedCols ? savedCols.includes(col) : true;
         html += `
           <label class="col-item">
-            <input type="checkbox" class="col-checkbox" value="${col}" ${isChecked ? 'checked' : ''}>
+            <input type="checkbox" class="col-checkbox" value="${col}" onchange="updateColCountLabel()" ${isChecked ? 'checked' : ''}>
             <span>${col}</span>
           </label>`;
       }
 
       document.getElementById('columnsList').innerHTML = html;
+      updateColCountLabel();
+    }
+
+    function updateColCountLabel() {
+      const el = document.getElementById('colCount');
+      if (!el) return;
+      const selected = document.querySelectorAll('.col-checkbox:checked').length;
+      const total = ALL_COLUMNS.length;
+      el.textContent = `${selected} of ${total} selected`;
+    }
+
+    function filterColumns() {
+      const query = document.getElementById('colSearch').value.toLowerCase();
+      document.querySelectorAll('.col-item').forEach(function(item) {
+        const name = item.querySelector('span').textContent.toLowerCase();
+        item.style.display = name.includes(query) ? '' : 'none';
+      });
+      const visible = document.querySelectorAll('.col-item:not([style*="display: none"])').length;
+      const total = ALL_COLUMNS.length;
+      const selected = document.querySelectorAll('.col-checkbox:checked').length;
+      document.getElementById('colCount').textContent =
+        visible < total
+          ? `${selected} selected · ${visible} of ${total} shown`
+          : `${selected} of ${total} selected`;
     }
 
     function toggleAllCols() {
       const checkboxes = document.querySelectorAll('.col-checkbox');
       const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
       checkboxes.forEach(cb => { cb.checked = anyUnchecked; });
+      updateColCountLabel();
     }
 
     function toggleColumns() {
