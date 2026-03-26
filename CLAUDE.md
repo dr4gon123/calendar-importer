@@ -20,16 +20,17 @@ There is no local test runner — testing requires opening the linked Google She
 The `.clasp.json` (gitignored) holds the `scriptId`. Use `.clasp.json.template` as the starting point when setting up a new environment.
 
 **First-time setup gotchas:**
+
 - Run `onOpen()` manually once in the Apps Script editor to grant permissions and register the menu
 - Enable **Google Calendar API** under Services in the Apps Script editor (Advanced Service, identifier `Calendar`)
 - If `clasp push` fails with "Insufficient Permission", run `clasp logout && clasp login` to refresh OAuth scopes
-- `createAddonMenu()` must chain with `.addToUi()` — not `.toUi()` (silent runtime error)
 
 ## Architecture
 
 Two files do everything:
 
 **`src/Code.js`** — server-side Apps Script (runs on Google's servers):
+
 - `onOpen()` — registers the Add-ons menu item
 - `getCalendars()` — returns all calendars via `CalendarApp`
 - `getSavedSettings()` — reads last-used dates, calendar selection, and columns from `PropertiesService.getUserProperties()`
@@ -37,6 +38,7 @@ Two files do everything:
 - `_parseRRule(rrule)` — converts RRULE strings to human-readable recurrence labels
 
 **`src/Sidebar.html`** — client-side HTML/CSS/JS rendered in the sidebar:
+
 - Communicates with `Code.js` exclusively via `google.script.run.*` (async, callback-based)
 - `checkedState` object is the source of truth for which calendars are selected — the DOM checkboxes mirror it, not the other way around
 - Calendar list filtering uses CSS show/hide (not DOM rebuild) to avoid reflow
