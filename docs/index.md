@@ -4,7 +4,7 @@ title: Calendar Importer
 ---
 
 <p style="text-align:center;">
-  <img src="/icon-512.png" alt="Calendar Importer" width="128" height="128" />
+  <img src="icon-512.png" alt="Calendar Importer" width="128" height="128" />
 </p>
 
 # Calendar Importer
@@ -43,7 +43,7 @@ The add-on requests three permissions, each used for a specific purpose:
 | See, edit, create, and delete your spreadsheets | Write the imported events into the active spreadsheet, and remember your preferences |
 | Display its sidebar interface | Show the importer inside Google Sheets |
 
-See the **[Privacy Policy](/privacy-policy/)** and **[Terms of Service](/terms-of-service/)**
+See the **[Privacy Policy](privacy-policy/)** and **[Terms of Service](terms-of-service/)**
 for full details.
 
 ## Get started
