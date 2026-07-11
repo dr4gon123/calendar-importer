@@ -100,39 +100,21 @@
     }
 
     /* ── Calendar list ── */
-    .calendar-search {
-      display: block;
-      width: 100%;
-      padding: 6px 8px;
-      border: 1px solid #dadce0;
-      border-bottom: none;
-      border-radius: 4px 4px 0 0;
-      font-size: 12px;
-      color: #202124;
-      background: #fff;
-      outline: none;
-    }
-
-    .calendar-search:focus {
-      border-color: #1a73e8;
-      border-bottom: none;
-    }
-
+    .calendar-search,
     .col-search {
       display: block;
       width: 100%;
-      box-sizing: border-box;
       padding: 6px 8px;
       border: 1px solid #dadce0;
-      border-radius: 4px 4px 0 0;
       border-bottom: none;
+      border-radius: 4px 4px 0 0;
       font-size: 12px;
       color: #202124;
       background: #fff;
       outline: none;
-      margin-bottom: 0;
     }
 
+    .calendar-search:focus,
     .col-search:focus {
       border-color: #1a73e8;
       border-bottom: none;
@@ -397,30 +379,26 @@
     // ── Init ────────────────────────────────────────────────────────────────
 
     // Load saved settings first, then calendars (so saved selection can be applied)
+    function loadCalendars() {
+      google.script.run
+        .withSuccessHandler(renderCalendars)
+        .withFailureHandler(function() {
+          document.getElementById('calendarList').innerHTML =
+            '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
+        })
+        .getCalendars();
+    }
+
+    function applySettings(settings) {
+      savedSettings = settings;
+      applyDefaultDates(settings);
+      buildColumnsList();
+      loadCalendars();
+    }
+
     google.script.run
-      .withSuccessHandler(function(settings) {
-        savedSettings = settings;
-        applyDefaultDates(settings);
-        buildColumnsList();
-        google.script.run
-          .withSuccessHandler(renderCalendars)
-          .withFailureHandler(function() {
-            document.getElementById('calendarList').innerHTML =
-              '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
-          })
-          .getCalendars();
-      })
-      .withFailureHandler(function() {
-        applyDefaultDates(null);
-        buildColumnsList();
-        google.script.run
-          .withSuccessHandler(renderCalendars)
-          .withFailureHandler(function() {
-            document.getElementById('calendarList').innerHTML =
-              '<div class="loading-calendars" style="color:#c5221f">Failed to load calendars</div>';
-          })
-          .getCalendars();
-      })
+      .withSuccessHandler(applySettings)
+      .withFailureHandler(function() { applySettings(null); })
       .getSavedSettings();
 
     // ── Dates ────────────────────────────────────────────────────────────────
@@ -567,16 +545,19 @@
 
     function filterCalendars() {
       const query = document.getElementById('calSearch').value.toLowerCase();
+      let visible = 0;
       document.querySelectorAll('.cal-item').forEach(function(item) {
         const name = item.querySelector('.cal-name').textContent.toLowerCase();
-        item.style.display = name.includes(query) ? '' : 'none';
+        const show = name.includes(query);
+        item.style.display = show ? '' : 'none';
+        if (show) visible++;
       });
-      const visible = document.querySelectorAll('.cal-item:not([style*="display: none"])').length;
       const total = allCalendars.length;
+      const selected = Object.values(checkedState).filter(Boolean).length;
       document.getElementById('calCount').textContent =
         visible < total
-          ? `${Object.values(checkedState).filter(Boolean).length} selected · ${visible} of ${total} shown`
-          : `${Object.values(checkedState).filter(Boolean).length} of ${total} selected`;
+          ? `${selected} selected · ${visible} of ${total} shown`
+          : `${selected} of ${total} selected`;
     }
 
     function toggleAllCals() {
@@ -622,11 +603,13 @@
 
     function filterColumns() {
       const query = document.getElementById('colSearch').value.toLowerCase();
+      let visible = 0;
       document.querySelectorAll('.col-item').forEach(function(item) {
         const name = item.querySelector('span').textContent.toLowerCase();
-        item.style.display = name.includes(query) ? '' : 'none';
+        const show = name.includes(query);
+        item.style.display = show ? '' : 'none';
+        if (show) visible++;
       });
-      const visible = document.querySelectorAll('.col-item:not([style*="display: none"])').length;
       const total = ALL_COLUMNS.length;
       const selected = document.querySelectorAll('.col-checkbox:checked').length;
       document.getElementById('colCount').textContent =
@@ -664,7 +647,9 @@
         return;
       }
 
-      const calendarIds = Object.keys(checkedState).filter(id => checkedState[id]);
+      const selectedCals = allCalendars.filter(c => checkedState[c.id]);
+      const calendarIds = selectedCals.map(c => c.id);
+      const calendarNames = selectedCals.map(c => c.name);
       if (calendarIds.length === 0) {
         showStatus('error', 'Please select at least one calendar.');
         return;
@@ -689,7 +674,7 @@
           setLoading(false);
           showStatus('error', 'Error: ' + (err.message || err));
         })
-        .importEvents({ startDate, endDate, calendarIds, columns });
+        .importEvents({ startDate, endDate, calendarIds, calendarNames, columns });
     }
 
     function setLoading(on) {

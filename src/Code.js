@@ -20,8 +20,7 @@ function onInstall(e) {
 
 function showSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle('Calendar Importer')
-    .setWidth(320);
+    .setTitle('Calendar Importer');
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
@@ -62,7 +61,7 @@ function getSavedSettings() {
  * @returns {{count: number, sheetName: string}}
  */
 function importEvents(params) {
-  const { startDate, endDate, calendarIds, columns } = params;
+  const { startDate, endDate, calendarIds, columns, calendarNames } = params;
 
   // Build time bounds — end date is inclusive (push to end of day)
   const timeMin = new Date(startDate + 'T00:00:00').toISOString();
@@ -84,8 +83,15 @@ function importEvents(params) {
   const rows = [];
   const rruleCache = {};  // key: calId + '|' + recurringEventId → human-readable string
 
+  // Calendar names come from the client (already fetched via getCalendars());
+  // fall back to the ID if a name wasn't passed for a calendar.
+  const nameById = {};
+  if (Array.isArray(calendarNames)) {
+    calendarIds.forEach((id, i) => { nameById[id] = calendarNames[i]; });
+  }
+
   for (const calId of calendarIds) {
-    const calName = _getCalendarName(calId);
+    const calName = nameById[calId] || calId;
     let pageToken;
 
     do {
@@ -188,15 +194,12 @@ function importEvents(params) {
 
   // Data rows
   if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, selectedColumns.length).setValues(rows);
+    const dataRange = sheet.getRange(2, 1, rows.length, selectedColumns.length);
+    dataRange.setValues(rows);
 
-    // Format Start and End date columns if selected
-    ['Start', 'End'].forEach(colName => {
-      const pos = selectedColumns.indexOf(colName);
-      if (pos !== -1) {
-        sheet.getRange(2, pos + 1, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm');
-      }
-    });
+    // Apply the date format to the Start/End columns in a single call
+    const fmtRow = selectedColumns.map(c => (c === 'Start' || c === 'End') ? 'yyyy-mm-dd hh:mm' : '');
+    dataRange.setNumberFormats(rows.map(() => fmtRow));
   }
 
   sheet.setFrozenRows(1);
@@ -210,16 +213,6 @@ function importEvents(params) {
   });
 
   return { count: rows.length, sheetName: sheet.getName() };
-}
-
-/** @private */
-function _getCalendarName(calId) {
-  try {
-    const cal = CalendarApp.getCalendarById(calId);
-    return cal ? cal.getName() : calId;
-  } catch (e) {
-    return calId;
-  }
 }
 
 /**
