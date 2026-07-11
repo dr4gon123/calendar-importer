@@ -3,11 +3,19 @@
  * Imports Google Calendar events into the active sheet.
  */
 
-function onOpen() {
+function onOpen(e) {
   SpreadsheetApp.getUi()
     .createAddonMenu()
     .addItem('Open Calendar Importer', 'showSidebar')
     .addToUi();
+}
+
+/**
+ * Runs when the add-on is installed from the Marketplace.
+ * Calls onOpen so the menu appears immediately, without needing a sheet refresh.
+ */
+function onInstall(e) {
+  onOpen(e);
 }
 
 function showSidebar() {
