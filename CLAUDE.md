@@ -15,6 +15,8 @@ npx clasp push        # push src/ to Apps Script
 npx clasp open        # open the script editor in browser
 ```
 
+Always to `npx clasp push` after making changes.
+
 There is no local test runner — testing requires opening the linked Google Sheet after each push, then using **Extensions > Calendar Importer > Open Calendar Importer**.
 
 The `.clasp.json` (gitignored) holds the `scriptId`. Use `.clasp.json.template` as the starting point when setting up a new environment.
@@ -56,5 +58,13 @@ Two files do everything:
 
 ## Linked resources
 
-- **Google Sheet:** `https://docs.google.com/spreadsheets/d/1MFaZCXDUrE8MKPlEg_jLaPrviUvQEr5-VA6sg0K1MRE`
-- **Apps Script project:** `https://script.google.com/d/1N314c8s4aO0Yx8FrzMjAca57Ys--dbfrcTC7COJIFjBL4IB0oMecWC8x/edit`
+The Google Sheet ID and Apps Script project ID are **not hardcoded here** — they live in `.clasp.json` (gitignored). Both URLs are derived from it:
+
+- **Apps Script project:** `https://script.google.com/d/<scriptId>/edit` — where `scriptId` is `.clasp.json`'s `scriptId`
+- **Google Sheet:** `https://docs.google.com/spreadsheets/d/<parentId[0]>` — where the Sheet ID is the first entry of `.clasp.json`'s `parentId` array
+
+Print the current links from `.clasp.json`:
+
+```bash
+jq -r '"Sheet:     https://docs.google.com/spreadsheets/d/" + .parentId[0], "Script:    https://script.google.com/d/" + .scriptId + "/edit"' .clasp.json
+```
