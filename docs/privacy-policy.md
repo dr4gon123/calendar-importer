@@ -1,3 +1,8 @@
+---
+layout: default
+title: Privacy Policy — Calendar Importer
+---
+
 # Privacy Policy for Calendar Importer
 
 **Last updated:** July 10, 2026

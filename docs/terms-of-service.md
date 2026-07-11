@@ -1,3 +1,8 @@
+---
+layout: default
+title: Terms of Service — Calendar Importer
+---
+
 # Terms of Service for Calendar Importer
 
 **Last updated:** July 10, 2026
