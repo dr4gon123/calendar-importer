@@ -147,7 +147,7 @@
 
     .toggle-all:hover { text-decoration: underline; }
 
-    .cal-header-actions { display: flex; gap: 10px; }
+    .list-header-actions { display: flex; gap: 10px; }
     .toggle-all.active { font-weight: 600; text-decoration: underline; }
 
     .cal-item {
@@ -377,7 +377,8 @@
 
     var allCalendars = [];
     var checkedState = {};       // calId → boolean
-    var selectedOnly = false;    // when true, the list filters to checked calendars
+    var selectedOnly = false;    // when true, the calendar list filters to checked
+    var selectedOnlyCols = false; // when true, the columns list filters to checked
     var savedSettings = null;    // loaded once on open
 
     // ── Init ────────────────────────────────────────────────────────────────
@@ -522,7 +523,7 @@
       let html = `
         <div class="calendar-list-header">
           <span style="font-size:11px;color:#5f6368" id="calCount"></span>
-          <span class="cal-header-actions">
+          <span class="list-header-actions">
             <span class="toggle-all" id="selectedOnlyToggle" onclick="toggleSelectedOnly()">Selected</span>
             <span class="toggle-all" onclick="toggleAllCals()">All / None</span>
           </span>
@@ -593,14 +594,17 @@
       let html = `
         <div class="columns-list-header">
           <span style="font-size:11px;color:#5f6368" id="colCount"></span>
-          <span class="toggle-all" onclick="toggleAllCols()">All / None</span>
+          <span class="list-header-actions">
+            <span class="toggle-all" id="selectedOnlyColToggle" onclick="toggleSelectedOnlyCols()">Selected</span>
+            <span class="toggle-all" onclick="toggleAllCols()">All / None</span>
+          </span>
         </div>`;
 
       for (const col of ALL_COLUMNS) {
         const isChecked = savedCols ? savedCols.includes(col) : true;
         html += `
           <label class="col-item">
-            <input type="checkbox" class="col-checkbox" value="${col}" onchange="updateColCountLabel()" ${isChecked ? 'checked' : ''}>
+            <input type="checkbox" class="col-checkbox" value="${col}" onchange="onColToggle()" ${isChecked ? 'checked' : ''}>
             <span>${col}</span>
           </label>`;
       }
@@ -621,8 +625,9 @@
       const query = document.getElementById('colSearch').value.toLowerCase();
       let visible = 0;
       document.querySelectorAll('.col-item').forEach(function(item) {
+        const cb = item.querySelector('.col-checkbox');
         const name = item.querySelector('span').textContent.toLowerCase();
-        const show = name.includes(query);
+        const show = name.includes(query) && (!selectedOnlyCols || cb.checked);
         item.style.display = show ? '' : 'none';
         if (show) visible++;
       });
@@ -634,11 +639,23 @@
           : `${selected} of ${total} selected`;
     }
 
+    function toggleSelectedOnlyCols() {
+      selectedOnlyCols = !selectedOnlyCols;
+      document.getElementById('selectedOnlyColToggle').classList.toggle('active', selectedOnlyCols);
+      filterColumns();
+    }
+
+    function onColToggle() {
+      updateColCountLabel();
+      if (selectedOnlyCols) filterColumns();
+    }
+
     function toggleAllCols() {
       const checkboxes = document.querySelectorAll('.col-checkbox');
       const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
       checkboxes.forEach(cb => { cb.checked = anyUnchecked; });
       updateColCountLabel();
+      if (selectedOnlyCols) filterColumns();
     }
 
     function toggleColumns() {
