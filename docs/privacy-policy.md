@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Privacy Policy — Calendar Importer
+permalink: /privacy-policy/
 ---
 
 # Privacy Policy for Calendar Importer

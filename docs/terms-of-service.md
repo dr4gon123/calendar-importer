@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Terms of Service — Calendar Importer
+permalink: /terms-of-service/
 ---
 
 # Terms of Service for Calendar Importer
