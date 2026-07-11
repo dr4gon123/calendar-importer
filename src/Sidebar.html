@@ -147,6 +147,9 @@
 
     .toggle-all:hover { text-decoration: underline; }
 
+    .cal-header-actions { display: flex; gap: 10px; }
+    .toggle-all.active { font-weight: 600; text-decoration: underline; }
+
     .cal-item {
       display: flex;
       align-items: center;
@@ -374,6 +377,7 @@
 
     var allCalendars = [];
     var checkedState = {};       // calId → boolean
+    var selectedOnly = false;    // when true, the list filters to checked calendars
     var savedSettings = null;    // loaded once on open
 
     // ── Init ────────────────────────────────────────────────────────────────
@@ -518,7 +522,10 @@
       let html = `
         <div class="calendar-list-header">
           <span style="font-size:11px;color:#5f6368" id="calCount"></span>
-          <span class="toggle-all" onclick="toggleAllCals()">Select all / None</span>
+          <span class="cal-header-actions">
+            <span class="toggle-all" id="selectedOnlyToggle" onclick="toggleSelectedOnly()">Selected</span>
+            <span class="toggle-all" onclick="toggleAllCals()">All / None</span>
+          </span>
         </div>`;
 
       for (const cal of calendars) {
@@ -541,14 +548,16 @@
     function updateChecked(cb) {
       checkedState[cb.value] = cb.checked;
       updateCountLabel();
+      if (selectedOnly) filterCalendars();
     }
 
     function filterCalendars() {
       const query = document.getElementById('calSearch').value.toLowerCase();
       let visible = 0;
       document.querySelectorAll('.cal-item').forEach(function(item) {
+        const cb = item.querySelector('.cal-checkbox');
         const name = item.querySelector('.cal-name').textContent.toLowerCase();
-        const show = name.includes(query);
+        const show = name.includes(query) && (!selectedOnly || cb.checked);
         item.style.display = show ? '' : 'none';
         if (show) visible++;
       });
@@ -560,6 +569,12 @@
           : `${selected} of ${total} selected`;
     }
 
+    function toggleSelectedOnly() {
+      selectedOnly = !selectedOnly;
+      document.getElementById('selectedOnlyToggle').classList.toggle('active', selectedOnly);
+      filterCalendars();
+    }
+
     function toggleAllCals() {
       const checkboxes = document.querySelectorAll('.cal-checkbox');
       const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
@@ -568,6 +583,7 @@
         checkedState[cb.value] = anyUnchecked;
       });
       updateCountLabel();
+      if (selectedOnly) filterCalendars();
     }
 
     // ── Columns ─────────────────────────────────────────────────────────────
