@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Google Sheets Add-on (Google Apps Script) that imports Google Calendar events into the active sheet via a sidebar UI. Internal use only — deployed to a Google Workspace domain, not published to the Marketplace.
+A Google Sheets Add-on (Google Apps Script) that imports Google Calendar events into the active sheet via a sidebar UI. Distributed internally via a **Private** Google Workspace Marketplace listing — installable only within the `supra.com.pe` domain (no public listing, no OAuth verification).
 
 ## Development workflow
 
@@ -26,6 +26,10 @@ The `.clasp.json` (gitignored) holds the `scriptId`. Use `.clasp.json.template` 
 - Run `onOpen()` manually once in the Apps Script editor to grant permissions and register the menu
 - Enable **Google Calendar API** under Services in the Apps Script editor (Advanced Service, identifier `Calendar`)
 - If `clasp push` fails with "Insufficient Permission", run `clasp logout && clasp login` to refresh OAuth scopes
+
+### Publishing a new version
+
+The add-on is published privately to the Marketplace (internal, `supra.com.pe` only). For future code changes, the loop is: **edit → `yes | npx clasp push` → `yes | npx clasp version "release notes"` → bump the version field in App Configuration → Publish**. (The `yes |` is required because bare `clasp push` / `clasp version` hang on an interactive prompt in non-interactive shells.)
 
 ## Architecture
 
